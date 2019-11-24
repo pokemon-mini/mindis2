@@ -1,0 +1,9 @@
+
+*.asm
+*.min
+*.txt
+*.eep
+*.bin
+*.ep
+*.unk
+*.sym
