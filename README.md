@@ -1,2 +1,2 @@
 # mindis2
- Pokémon Mini disassembler
+ Pokémon Mini ROM disassembler
