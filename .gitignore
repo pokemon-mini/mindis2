@@ -7,3 +7,6 @@
 *.ep
 *.unk
 *.sym
+*.bps
+*.bak
+*.e

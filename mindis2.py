@@ -13,12 +13,15 @@ parser.add_argument("-e", "--entrypoints", type = str, help = "Newline-separated
 parser.add_argument("-d", "--debug", action = "store_true", help = "Display file offset for debugging purposes (optional, default = False)")
 parser.add_argument("-b", "--bios", action = "store_true", help = "Change some functionality of the disassembler to properly handle disassembling the BIOS (optional, default = False)")
 parser.add_argument("-ne", "--no_default_entrypoints", action = "store_true", help = "Only use entrypoints added with -e (optional, default = False)")
-parser.add_argument("-i", "--prompt_ignores", action = "store_true", help = "Prompt JP HL instructions to ignore (optional, default = FALSE)")
+parser.add_argument("-i", "--prompt_ignores", action = "store_true", help = "Prompt JP HL instructions to ignore (optional, default = False)")
+parser.add_argument("-of", "--offset", type = lambda x: int(x, 16), help = "Memory offset to use for jumps and loads - handy when disassembling parts of binaries (optional)")
 
 args = parser.parse_args()
 
 rom = bytearray(open(args.inp, "rb").read())
 
+if args.offset:
+    rom = bytearray([0] * args.offset) + rom # quick and dirty way to handle offsets
 usedArray = [False] * len(rom) # checked to see if an address has already been disassembled
 
 entrypoints = [[ # code entrypoints list - dynamically extended as code paths are found
@@ -131,121 +134,149 @@ entrypoints = [[ # code entrypoints list - dynamically extended as code paths ar
 ][2 if args.no_default_entrypoints else 1 if args.bios else 0]
 
 replacements = [[ # symbols used for every game
-    [0x2102, "reset_vector",],
-    [0x2108, "prc_frame_copy_irq",],
-    [0x210E, "prc_render_irq",],
-    [0x2114, "timer_2h_underflow_irq",],
-    [0x211A, "timer_2l_underflow_irq",],
-    [0x2120, "timer_1h_underflow_irq",],
-    [0x2126, "timer_1l_underflow_irq",],
-    [0x212C, "timer_3h_underflow_irq",],
-    [0x2132, "timer_3_cmp_irq",],
-    [0x2138, "timer_32hz_irq",],
-    [0x213E, "timer_8hz_irq",],
-    [0x2144, "timer_2hz_irq",],
-    [0x214A, "timer_1hz_irq",],
-    [0x2150, "ir_rx_irq",],
-    [0x2156, "shake_irq",],
-    [0x215C, "key_power_irq",],
-    [0x2162, "key_right_irq",],
-    [0x2168, "key_left_irq",],
-    [0x216E, "key_down_irq",],
-    [0x2174, "key_up_irq",],
-    [0x217A, "key_c_irq",],
-    [0x2180, "key_b_irq",],
-    [0x2186, "key_a_irq",],
-    [0x218C, "unknown_irq0",],
-    [0x2192, "unknown_irq1",],
-    [0x2198, "unknown_irq2",],
-    [0x219E, "cartridge_irq",],
+    ["loc_0x002102", "reset_vector",],
+    ["loc_0x002108", "prc_frame_copy_irq",],
+    ["loc_0x00210E", "prc_render_irq",],
+    ["loc_0x002114", "timer_2h_underflow_irq",],
+    ["loc_0x00211A", "timer_2l_underflow_irq",],
+    ["loc_0x002120", "timer_1h_underflow_irq",],
+    ["loc_0x002126", "timer_1l_underflow_irq",],
+    ["loc_0x00212C", "timer_3h_underflow_irq",],
+    ["loc_0x002132", "timer_3_cmp_irq",],
+    ["loc_0x002138", "timer_32hz_irq",],
+    ["loc_0x00213E", "timer_8hz_irq",],
+    ["loc_0x002144", "timer_2hz_irq",],
+    ["loc_0x00214A", "timer_1hz_irq",],
+    ["loc_0x002150", "ir_rx_irq",],
+    ["loc_0x002156", "shake_irq",],
+    ["loc_0x00215C", "key_power_irq",],
+    ["loc_0x002162", "key_right_irq",],
+    ["loc_0x002168", "key_left_irq",],
+    ["loc_0x00216E", "key_down_irq",],
+    ["loc_0x002174", "key_up_irq",],
+    ["loc_0x00217A", "key_c_irq",],
+    ["loc_0x002180", "key_b_irq",],
+    ["loc_0x002186", "key_a_irq",],
+    ["loc_0x00218C", "unknown_irq0",],
+    ["loc_0x002192", "unknown_irq1",],
+    ["loc_0x002198", "unknown_irq2",],
+    ["loc_0x00219E", "cartridge_irq",],
 ], [ # symbols used for bios
-    [0x009A, "reset_vector"],
-    [0x00AB, "unused"],
-    [0x01CF, "prc_frame_copy_irq"],
-    [0x01E0, "prc_render_irq"],
-    [0x01F1, "timer_2h_underflow_irq"],
-    [0x0202, "timer_2l_underflow_irq"],
-    [0x0213, "timer_1h_underflow_irq"],
-    [0x0224, "timer_1l_underflow_irq"],
-    [0x0235, "timer_3h_underflow_irq"],
-    [0x0246, "timer_3_cmp_irq"],
-    [0x025A, "timer_32hz_irq"],
-    [0x026B, "timer_8hz_irq"],
-    [0x027C, "timer_2hz_irq"],
-    [0x028D, "timer_1hz_irq"],
-    [0x029E, "ir_rx_irq"],
-    [0x02AF, "shake_irq"],
-    [0x043E, "cart_ejected_irq"],
-    [0x02C0, "cartridge_irq"],
-    [0x03BA, "key_power_irq"],
-    [0x02D1, "key_right_irq"],
-    [0x02E2, "key_left_irq"],
-    [0x02F3, "key_down_irq"],
-    [0x0304, "key_up_irq"],
-    [0x0315, "key_c_irq"],
-    [0x0326, "key_b_irq"],
-    [0x0337, "key_a_irq"],
-    [0x0348, "unknown_irq0"],
-    [0x035C, "unknown_irq1"],
-    [0x036D, "unknown_irq2"],
-    [0x0713, "suspend_system"],
-    [0x077C, "sleep"],
-    [0x078B, "sleep_with_display"],
-    [0x079D, "shutdown"],
-    [0x07B1, "unknown_eject0"],
-    [0x07E9, "default_contrast"],
-    [0x0802, "change_contrast"],
-    [0x081B, "apply_default_contrast"],
-    [0x0821, "get_default_contrast"],
-    [0x0830, "set_temp_contast"],
-    [0x084E, "lcd_on"],
-    [0x0871, "init_lcd"],
-    [0x08CB, "lcd_off"],
-    [0x08EC, "ena_ram_vec"],
-    [0x0904, "dis_ram_vec"],
-    [0x0923, "dis_irq_13"],
-    [0x092E, "ena_irq_13"],
-    [0x0949, "unknown_eject1"],
-    [0x0961, "unknown_eject2"],
-    [0x097D, "dev_card0"],
-    [0x09E4, "dev_card1"],
-    [0x0A4F, "unknown_eject3"],
-    [0x0A76, "dis_cart_eject"],
-    [0x0A81, "unknown_eject4"],
-    [0x0AA6, "inc_cpu_speed"],
-    [0x0ACD, "recover_inc_cpu"],
-    [0x0AE6, "cart_off_update0"],
-    [0x0AF9, "cart_off_update1"],
-    [0x0B20, "cart_detect"],
-    [0x0B2E, "read_structure"],
-    [0x0B8F, "set_prc_rate"],
-    [0x0BA3, "get_prc_rate"],
-    [0x0BB1, "test_cart_type"],
-    [0x047A, "dev_read_ids"],
-    [0x0493, "dev_reset"],
-    [0x04A4, "dev_program_byte"],
-    [0x04C8, "dev_erase_sector"],
-    [0x04F5, "dev_unlock_page_register"],
-    [0x0506, "dev_sel_bank"],
-    [0x0517, "dev_cmd_c9"],
-    [0x0529, "dev_prepare_readout"],
-    [0x053A, "dev_sel_game"],
-    [0x0BBD, "ir_pulse"],
+    ["loc_0x00009A", "reset_vector"],
+    ["loc_0x0000AB", "unused"],
+    ["loc_0x0001CF", "prc_frame_copy_irq"],
+    ["loc_0x0001E0", "prc_render_irq"],
+    ["loc_0x0001F1", "timer_2h_underflow_irq"],
+    ["loc_0x000202", "timer_2l_underflow_irq"],
+    ["loc_0x000213", "timer_1h_underflow_irq"],
+    ["loc_0x000224", "timer_1l_underflow_irq"],
+    ["loc_0x000235", "timer_3h_underflow_irq"],
+    ["loc_0x000246", "timer_3_cmp_irq"],
+    ["loc_0x00025A", "timer_32hz_irq"],
+    ["loc_0x00026B", "timer_8hz_irq"],
+    ["loc_0x00027C", "timer_2hz_irq"],
+    ["loc_0x00028D", "timer_1hz_irq"],
+    ["loc_0x00029E", "ir_rx_irq"],
+    ["loc_0x0002AF", "shake_irq"],
+    ["loc_0x00043E", "cart_ejected_irq"],
+    ["loc_0x0002C0", "cartridge_irq"],
+    ["loc_0x0003BA", "key_power_irq"],
+    ["loc_0x0002D1", "key_right_irq"],
+    ["loc_0x0002E2", "key_left_irq"],
+    ["loc_0x0002F3", "key_down_irq"],
+    ["loc_0x000304", "key_up_irq"],
+    ["loc_0x000315", "key_c_irq"],
+    ["loc_0x000326", "key_b_irq"],
+    ["loc_0x000337", "key_a_irq"],
+    ["loc_0x000348", "unknown_irq0"],
+    ["loc_0x00035C", "unknown_irq1"],
+    ["loc_0x00036D", "unknown_irq2"],
+    ["loc_0x000713", "suspend_system"],
+    ["loc_0x00077C", "sleep"],
+    ["loc_0x00078B", "sleep_with_display"],
+    ["loc_0x00079D", "shutdown"],
+    ["loc_0x0007B1", "unknown_eject0"],
+    ["loc_0x0007E9", "default_contrast"],
+    ["loc_0x000802", "change_contrast"],
+    ["loc_0x00081B", "apply_default_contrast"],
+    ["loc_0x000821", "get_default_contrast"],
+    ["loc_0x000830", "set_temp_contast"],
+    ["loc_0x00084E", "lcd_on"],
+    ["loc_0x000871", "init_lcd"],
+    ["loc_0x0008CB", "lcd_off"],
+    ["loc_0x0008EC", "ena_ram_vec"],
+    ["loc_0x000904", "dis_ram_vec"],
+    ["loc_0x000923", "dis_irq_13"],
+    ["loc_0x00092E", "ena_irq_13"],
+    ["loc_0x000949", "unknown_eject1"],
+    ["loc_0x000961", "unknown_eject2"],
+    ["loc_0x00097D", "dev_card0"],
+    ["loc_0x0009E4", "dev_card1"],
+    ["loc_0x000A4F", "unknown_eject3"],
+    ["loc_0x000A76", "dis_cart_eject"],
+    ["loc_0x000A81", "unknown_eject4"],
+    ["loc_0x000AA6", "inc_cpu_speed"],
+    ["loc_0x000ACD", "recover_inc_cpu"],
+    ["loc_0x000AE6", "cart_off_update0"],
+    ["loc_0x000AF9", "cart_off_update1"],
+    ["loc_0x000B20", "cart_detect"],
+    ["loc_0x000B2E", "read_structure"],
+    ["loc_0x000B8F", "set_prc_rate"],
+    ["loc_0x000BA3", "get_prc_rate"],
+    ["loc_0x000BB1", "test_cart_type"],
+    ["loc_0x00047A", "dev_read_ids"],
+    ["loc_0x000493", "dev_reset"],
+    ["loc_0x0004A4", "dev_program_byte"],
+    ["loc_0x0004C8", "dev_erase_sector"],
+    ["loc_0x0004F5", "dev_unlock_page_register"],
+    ["loc_0x000506", "dev_sel_bank"],
+    ["loc_0x000517", "dev_cmd_c9"],
+    ["loc_0x000529", "dev_prepare_readout"],
+    ["loc_0x00053A", "dev_sel_game"],
+    ["loc_0x000BBD", "ir_pulse"],
     ], [
     ]
 ][2 if args.no_default_entrypoints else 1 if args.bios else 0]
+
+def hexStr(num, digits): # convert number to hex string with given number of digits, ensuring a leading 0 where required, as per the weird assembly syntax
+    value = hex(num).replace("0x", "").upper().zfill(digits)
+    if not value[0] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
+        if not value.startswith("-"):
+            value = "0" + value
+        else:
+            if not value.lstrip("-")[0] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
+                value = "-0" + value.lstrip("-")
+    return value
+
+labs = [] # initialise labels array
 
 if args.symbols: # if the user passes a symbols file, parse it and add to the replacements array
     symfile = open(args.symbols).readlines()
     
     syms = []
+    lab = []
+    repls = []
     for i in symfile:
-        if (split := i.split())[0] in ["LAB", "LOC"]:
-            syms.append(split[1:])
+        if i == "" or i.startswith(";"):
+            continue
+        if (split := i.split())[0] in ["LOC", "LAB"] and split[2] != split[2].upper():
+            syms.append(split[:])
+        if (split := i.split())[0] in ["LAB"] and split[2] != split[2].upper():
+            lab.append(split[:])
+        if (split := i.split())[0] in ["REPL"]:
+            repls.append(split[:])        
     for i in syms:
-        address = int(i[0].replace("$", ""), 16)
-        label = i[1].rstrip("\n")
-        replacements.append([address, label])
+        address = int(i[1].replace("$", ""), 16)
+        label = i[2].rstrip("\n")
+        replacements.append(["loc_0x{}".format(hexStr(address, 6)), label])
+        if i[0] == "LOC":
+            entrypoints.append([address & 0xFFFF, [], address >> 15])
+    for i in lab:
+        address = int(i[1].replace("$", ""), 16)
+        label = i[2].rstrip("\n")
+        labs.append([address, label])
+    for i in repls:
+        replacements.append(i[1:])      
 
 if args.entrypoints: # do the same for any additional entrypoints
     entrypointsfile = open(args.entrypoints).readlines()
@@ -275,7 +306,8 @@ if args.debug:
     sp_choice = 0
 
 STANDARD_PATTERN = ["0x{0}: ", "            ", "\t"][sp_choice] # pattern for regular instructions
-LOC_PATTERN = ["loc_0x{0}: ", "loc_0x{0}:\n" + STANDARD_PATTERN][1] # pattern for labels
+LOC_PATTERN = ["loc_0x{0}: ", "loc_0x{0}:\n"][1] # pattern for locs
+LAB_PATTERN = ["{1}:\n"][0]
 ASCII_PATTERN = [STANDARD_PATTERN + "ASCII \"{1}\""][0] # pattern for strings
 ASCIZ_PATTERN = [STANDARD_PATTERN + "ASCIZ \"{1}\""][0] # pattern for null-terminated strings
 DB_PATTERN = [STANDARD_PATTERN + "DB {1}h"][0] # pattern for data
@@ -285,16 +317,6 @@ SEPARATOR = "\n; ----------------------" # separator after unconditional jumps, 
 defsect = ["DEFSECT \".rom{0}\", CODE AT {1}\nSECT \".rom{0}\"" + SEPARATOR, ""][0] # defsect template for games
 
 defsect_bios = "DEFSECT \".bios\", CODE AT 0000H\nSECT \".bios\"" + SEPARATOR # defsect template for BIOS
-
-def hexStr(num, digits): # convert number to hex string with given number of digits, ensuring a leading 0 where required, as per the weird assembly syntax
-    value = hex(num).replace("0x", "").upper().zfill(digits)
-    if not value[0] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
-        if not value.startswith("-"):
-            value = "0" + value
-        else:
-            if not value.lstrip("-")[0] in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
-                value = "-0" + value.lstrip("-")
-    return value
 
 def be_uint16(num):
     return struct.unpack('>H', bytes([num % 0x100, num // 0x100]))[0]
@@ -324,7 +346,7 @@ lines = []
 for i in range(len(rom)):
     lines.append(STANDARD_PATTERN.format(hexStr(i, 6))) # initialise output array
 
-locs = set(i[0] for i in entrypoints) # initialise locs array
+locs = set(i[0] & 0xFFFF | i[2] << 15 if i[0] & 0x8000 else i[0] for i in entrypoints) # initialise locs array
 
 def getOffset(line, instEnd): # function for retrieving the destination of a jump from the raw disassembled line - for some reason I thought this was the best way to implement this
     num = ""
@@ -363,10 +385,6 @@ def disassemble(context): # function for actually disassembling a code path, giv
             
             curProgCounter = hexStr(progCounterFull, 6) # string representation of program counter used for things™
             
-            for i in replacements: # completely unnecessary and probably slows down the disassembly quite a bit
-                if i[0] == progCounterFull:
-                    curProgCounter = i[1]
-                    
             instr = instructions[opcode] # retrieve the instruction
             if instr is not None: # if it's a valid opcode,
                 if (is16 := len(instr)) == 3:
@@ -607,24 +625,39 @@ asciz = None
 
 dbmode = 0
 
+lastlab = None
+
 for i in range(len(lines)): # formatting and parsing of data and strings is really complicated and hard to understand - do your best
-    index = hexStr(i, 6)
-    if i in locs:
-        lines[i] = LOC_PATTERN.format(index) + lines[i].replace(STANDARD_PATTERN.format(index), "")
     
-    if not usedArray[i]:
-        lines[i] = DB_PATTERN.format(index, hexStr(rom[i], 2))
+    index = hexStr(i, 6)
+    if i in [j[0] for j in labs]:
+        for j in labs:
+            if i == j[0]:
+                lines[i] = LAB_PATTERN.format(index, j[1]) + lines[i]
+                replacements.append([hexStr(j[0], 4), j[1]])
+                dbs = 1
+                dbmode = 0
+                lastlab = j[1]
+                break
+    elif i in locs:
+        lines[i] = LOC_PATTERN.format(index) + lines[i]
+    
+    if not usedArray[i] and lines[i].endswith(STANDARD_PATTERN.format(index)):
+        lines[i] = lines[i].replace(STANDARD_PATTERN.format(index), DB_PATTERN.format(index, hexStr(rom[i], 2)))
     
     if (i + 1) % 0x8000 == 0 and i != 0:
         lines[i] += "\n" + defsect.format(section, hexStr(section * 0x8000, 6) + "H")
         section += 1
     
-    if lines[i].startswith(STANDARD_PATTERN.format(index) + "DB "):
+    if lines[i].startswith(STANDARD_PATTERN.format(index) + "DB ") or lines[i].startswith(LAB_PATTERN.format(index, lastlab) + STANDARD_PATTERN.format(index) + "DB "):
         if dbmode == 0:
             if rom[i] in [*range(48, 58), *range(65, 91), *range(97, 123)]:
                 dbs = 1
                 dbmode = 1
-                lines[i] = ASCII_PATTERN.format(index, chr(rom[i]))
+                if lines[i].startswith(LAB_PATTERN.format(index, lastlab)):
+                    lines[i] = LAB_PATTERN.format(index, lastlab) + ASCII_PATTERN.format(index, chr(rom[i]))
+                else:
+                    lines[i] = ASCII_PATTERN.format(index, chr(rom[i]))
         else:
             if rom[i] < 32 or rom[i] > 127:
                 if rom[i] == 0:
@@ -638,20 +671,23 @@ for i in range(len(lines)): # formatting and parsing of data and strings is real
         
         if dbmode == 0:
             if dbs < 8 and (sect := defsect.format(section - 1, hexStr((section - 1) * 0x8000, 6) + "H")) not in lines[i - 1]:
-                if asciz and lines[i - asciz].startswith(STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCII "):
+                if asciz and (lines[i - asciz].startswith(STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCII ") or lines[i - asciz].startswith(LAB_PATTERN.format(hexStr(i - asciz, 6), lastlab) + STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCII ")):
                     lines[i - asciz] = lines[i - asciz].replace(STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCII ", STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCIZ ")
                     lines[i] = STANDARD_PATTERN.format(index)
-                elif lines[i - dbs].startswith(STANDARD_PATTERN.format(hexStr(i - dbs, 6)) + "DB "):
+                elif (lines[i - dbs].startswith(STANDARD_PATTERN.format(hexStr(i - dbs, 6)) + "DB ") or lines[i - dbs].startswith(LAB_PATTERN.format(hexStr(i - dbs, 6), lastlab) + STANDARD_PATTERN.format(hexStr(i - dbs, 6)) + "DB ")) and not lines[i].startswith(LAB_PATTERN.format(hexStr(i, 6), lastlab) + STANDARD_PATTERN.format(hexStr(i, 6)) + "DB "):
                     lines[i - dbs] += ", {}h".format(hexStr(rom[i], 2))
                     lines[i] = STANDARD_PATTERN.format(index)
                     dbs += 1
+                else:
+                    dbs = 1
+                    dbmode = 0                    
                 
                 if (i + 1) % 0x8000 == 0 and i != 0:
                     lines[i] += "\n" + sect
         
             else:
                 dbs = 1                    
-        elif lines[i - dbs].startswith(STANDARD_PATTERN.format(hexStr(i - dbs, 6)) + "ASCII "):
+        elif lines[i - dbs].startswith(STANDARD_PATTERN.format(hexStr(i - dbs, 6)) + "ASCII ") or lines[i - dbs].startswith(LAB_PATTERN.format(hexStr(i - dbs, 6), lastlab) + STANDARD_PATTERN.format(hexStr(i - dbs, 6)) + "ASCII "):
             if rom[i] != 34:
                 lines[i - dbs] = lines[i - dbs][:-1] + chr(rom[i]) + "\""
             else:
@@ -668,10 +704,10 @@ for i in range(len(lines)): # formatting and parsing of data and strings is real
 for i in range(len(lines)): # final formatting before replacements
     if args.bios:
         break
-    if any(j in lines[i] for j in ["loc_0x218C", "loc_0x2192", "loc_0x2198"]):
+    if any(j in lines[i] for j in ["loc_0x00218C", "loc_0x002192", "loc_0x002198"]):
         if not lines[i - 1].endswith(SEPARATOR) and lines[i - 1] != STANDARD_PATTERN.format(hexStr(i - 1, 6)):
             lines[i - 1] += SEPARATOR # add separators for a couple of the IRQs
-    elif "loc_0x219E" in lines[i]: # cartridge IRQ is a pain to add a separator for
+    elif "loc_0x00219E" in lines[i]: # cartridge IRQ is a pain to add a separator for
         if not lines[i - 1].endswith(SEPARATOR) and lines[i - 1] != STANDARD_PATTERN.format(hexStr(i - 1, 6)):
             lines[i - 1] += SEPARATOR
         j = 0
@@ -686,24 +722,33 @@ for i in range(len(lines)): # final formatting before replacements
             j += 1
         break
     
-progStart = 0 if args.bios else 0x2100
+progStart = args.offset if args.offset else 0 if args.bios else 0x2100
 
-output = "\n".join([line.replace(STANDARD_PATTERN.format(hexStr(index + progStart, 6)) + "\n", "") + " ; {}".format(hexStr(index + progStart, 4).lower()) for index, line in enumerate(lines[progStart:]) if line != STANDARD_PATTERN.format(hexStr(index + progStart, 6))])
+output = "\n".join([line.replace(STANDARD_PATTERN.format(hexStr(index + progStart, 6)) + "\n", "") + "".format(hexStr(index + progStart, 4).lower()) for index, line in enumerate(lines[progStart:]) if line != STANDARD_PATTERN.format(hexStr(index + progStart, 6))])
 # clear empty lines
 unuseds = []
+unuseds_raw = []
 
 for i in replacements:
-    if (replacement := "loc_0x" + hexStr(i[0], 6)) in output:
-        output = output.replace(replacement, i[1])
+    if (replacement := i[0]) in output:
+        if replacement.startswith("loc_0x"):
+            output = output.replace(replacement, i[1])
+        else:
+            output = output.replace("[{0}h]".format(replacement), "[{0}]".format(i[1])).replace("#{0}h".format(replacement), "#{0}".format(i[1]))
     else: # apply symbols
-        unuseds.append("Unused symbol: {}".format(i[1]))
+        if replacement.lstrip("loc_0x") not in output and "loc_0x{0}".format(replacement.zfill(6)) not in output and i[1] not in unuseds_raw:
+            unuseds_raw.append(i[1])
+
+for i in unuseds_raw:
+    if i not in output:
+        unuseds.append("Unused symbol: {}".format(i))    
     
-if args.bios:
+if args.bios and not args.offset:
     output = defsect_bios + "\n" + output
 elif section == 1:
-    output = defsect.format("", "2100H") + "\n" + output
+    output = defsect.format("", "{}H".format(hexStr(progStart, 4))) + "\n" + output
 else:
-    output = defsect.format(0, "2100H") + "\n" + output
+    output = defsect.format(0, "{}H".format(hexStr(progStart, 4))) + "\n" + output
 # final prettification
 if args.out is not None:
     outpath = args.out
