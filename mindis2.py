@@ -355,7 +355,7 @@ def getOffset(line, instEnd): # function for retrieving the destination of a jum
             break
         num = i + num # traverse the line from the end going left until a separator is reached
     lineRaw = lines[line][::-1].replace(num[::-1], "", 1)[::-1] # remove the last instance of the number from the line
-    lowerBits = (instEnd + int(num.replace("#", "").replace("h", ""), 16) - 1) % 0x10000 # convert the number from a string and constrain it
+    lowerBits = (instEnd + int(num.replace("h", ""), 16) - 1) % 0x10000 # convert the number from a string and constrain it
     
     return lowerBits, lineRaw # return the line without the number and the raw program counter value
 
@@ -458,7 +458,7 @@ def disassemble(context): # function for actually disassembling a code path, giv
                     
                     locs.add(progCounterFull)
                 else:
-                    lines[progCounterFull] = lineRaw + "loc_0x" + hexStr(dest, 6) + " ; WARNING: NB not known, branch not executed"
+                    lines[progCounterFull] += " ; WARNING: NB not known, branch not executed"
                     # otherwise error
                     errors.append("ERROR: Branching instruction without NB set at {}".format(curProgCounter))
                     break
@@ -507,7 +507,7 @@ def disassemble(context): # function for actually disassembling a code path, giv
                     
                     locs.add(progCounterFull)
                 else:
-                    lines[progCounterFull] = lineRaw + "loc_0x" + hexStr(dest, 6) + " ; WARNING: NB not known, branch not executed"
+                    lines[progCounterFull] += " ; WARNING: NB not known, branch not executed"
                     
                     errors.append("ERROR: Branching instruction without NB set at {}".format(curProgCounter))
                     break
@@ -531,7 +531,7 @@ def disassemble(context): # function for actually disassembling a code path, giv
                     # and add a separator for niceness
                     locs.add(progCounterFull)
                 else:
-                    lines[progCounterFull] = lineRaw + "loc_0x" + hexStr(dest, 6) + " ; WARNING: NB not known, branch not executed"
+                    lines[progCounterFull] += " ; WARNING: NB not known, branch not executed"
 
                     lines[progCounterFull] += SEPARATOR          
                                         
@@ -586,6 +586,7 @@ def disassemble(context): # function for actually disassembling a code path, giv
             elif instruction[1] == ["FB"]:
                 warnings.append("WARNING: CALL [hhll] encountered at {}, some code past 0xFFFF will not be disassembled".format(curProgCounter))
                 programCounter = instrEnd
+                nb = cb
             elif instruction[1] == ["FD"]:
                 lines[progCounterFull] += SEPARATOR                
                 warnings.append("WARNING: JP [kk] encountered at {}, some code may not be disassembled".format(curProgCounter))
@@ -627,6 +628,8 @@ dbmode = 0
 
 lastlab = None
 
+sect = "non-empty string"
+
 for i in range(len(lines)): # formatting and parsing of data and strings is really complicated and hard to understand - do your best
     
     index = hexStr(i, 6)
@@ -646,7 +649,7 @@ for i in range(len(lines)): # formatting and parsing of data and strings is real
         lines[i] = lines[i].replace(STANDARD_PATTERN.format(index), DB_PATTERN.format(index, hexStr(rom[i], 2)))
     
     if (i + 1) % 0x8000 == 0 and i != 0:
-        lines[i] += "\n" + defsect.format(section, hexStr(section * 0x8000, 6) + "H")
+        lines[i] += "\n" + (sect := defsect.format(section, hexStr(section * 0x8000, 6) + "H"))
         section += 1
     
     if lines[i].startswith(STANDARD_PATTERN.format(index) + "DB ") or lines[i].startswith(LAB_PATTERN.format(index, lastlab) + STANDARD_PATTERN.format(index) + "DB "):
@@ -670,7 +673,7 @@ for i in range(len(lines)): # formatting and parsing of data and strings is real
                     lines[i - 1] = lines[i - 1][:-4]
         
         if dbmode == 0:
-            if dbs < 8 and (sect := defsect.format(section - 1, hexStr((section - 1) * 0x8000, 6) + "H")) not in lines[i - 1]:
+            if dbs < 8 and sect not in lines[i - 1]:
                 if asciz and (lines[i - asciz].startswith(STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCII ") or lines[i - asciz].startswith(LAB_PATTERN.format(hexStr(i - asciz, 6), lastlab) + STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCII ")):
                     lines[i - asciz] = lines[i - asciz].replace(STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCII ", STANDARD_PATTERN.format(hexStr(i - asciz, 6)) + "ASCIZ ")
                     lines[i] = STANDARD_PATTERN.format(index)
@@ -682,7 +685,7 @@ for i in range(len(lines)): # formatting and parsing of data and strings is real
                     dbs = 1
                     dbmode = 0                    
                 
-                if (i + 1) % 0x8000 == 0 and i != 0:
+                if (i + 1) % 0x8000 == 0 and i + 1 < len(rom):
                     lines[i] += "\n" + sect
         
             else:
@@ -693,6 +696,10 @@ for i in range(len(lines)): # formatting and parsing of data and strings is real
             else:
                 lines[i - dbs] = lines[i - dbs] + ", 22h, \"\"" # special case for if there's a " in there for some reason
             lines[i] = STANDARD_PATTERN.format(index)
+            if (i + 1) % 0x8000 == 0:
+                lines[i - dbs] += "\n" + sect
+                dbmode = 0
+                dbs = 0
             dbs += 1
  
     else:
