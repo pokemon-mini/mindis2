@@ -270,7 +270,7 @@ if args.symbols: # if the user passes a symbols file, parse it and add to the re
         label = i[2].rstrip("\n")
         replacements.append(["loc_0x{}".format(hexStr(address, 6)), label])
         if i[0] == "LOC":
-            entrypoints.append([address & 0xFFFF, [], address >> 15])
+            entrypoints.append([address & 0xFFFF | (0 if address < 0x10000 else 0x8000), [], address >> 15])
     for i in lab:
         address = int(i[1].replace("$", ""), 16)
         label = i[2].rstrip("\n")
@@ -282,7 +282,7 @@ if args.entrypoints: # do the same for any additional entrypoints
     entrypointsfile = open(args.entrypoints).readlines()
     
     for i in entrypointsfile:
-        entrypoints.append([int(i.rstrip("\n"), 16) & 0xFFFF, [], int(i.rstrip("\n"), 16) >> 15])
+        entrypoints.append([(address := int(i.rstrip("\n"), 16)) & 0xFFFF | (0 if address < 0x10000 else 0x8000), [], address >> 15])
 
 jphl = []
 if args.prompt_ignores: # JP HL instructions are sometimes impossible to disassemble without dynamic code analysis, so this argument disables warnings for a given instance
@@ -346,7 +346,7 @@ lines = []
 for i in range(len(rom)):
     lines.append(STANDARD_PATTERN.format(hexStr(i, 6))) # initialise output array
 
-locs = set(i[0] & 0xFFFF | i[2] << 15 if i[0] & 0x8000 else i[0] for i in entrypoints) # initialise locs array
+locs = set(i[0] & 0x7FFF | i[2] << 15 if i[0] & 0x8000 else i[0] for i in entrypoints) # initialise locs array
 
 def getOffset(line, instEnd): # function for retrieving the destination of a jump from the raw disassembled line - for some reason I thought this was the best way to implement this
     num = ""
@@ -454,7 +454,11 @@ def disassemble(context): # function for actually disassembling a code path, giv
                     cb = nb
                     progCounterFull = setProgCounterFull(programCounter, cb)
                     
-                    lines[prev] = lineRaw + "loc_0x" + hexStr(progCounterFull, 6) 
+                    if progCounterFull > 0x2100:
+                        lines[prev] = lineRaw + "loc_0x" + hexStr(progCounterFull, 6)
+                    else:
+                        diff = progCounterFull - prev
+                        lines[prev] = lineRaw + hexStr(diff, 4) + "h"
                     
                     locs.add(progCounterFull)
                 else:
@@ -503,7 +507,11 @@ def disassemble(context): # function for actually disassembling a code path, giv
                     cb = nb
                     progCounterFull = setProgCounterFull(programCounter, cb)
                     
-                    lines[prev] = lineRaw + "loc_0x" + hexStr(progCounterFull, 6) 
+                    if progCounterFull > 0x2100:
+                        lines[prev] = lineRaw + "loc_0x" + hexStr(progCounterFull, 6)
+                    else:
+                        diff = progCounterFull - prev
+                        lines[prev] = lineRaw + hexStr(diff, 4) + "h"
                     
                     locs.add(progCounterFull)
                 else:
@@ -525,7 +533,11 @@ def disassemble(context): # function for actually disassembling a code path, giv
                     cb = nb
                     progCounterFull = setProgCounterFull(programCounter, cb)
                     
-                    lines[prev] = lineRaw + "loc_0x" + hexStr(progCounterFull, 6) 
+                    if progCounterFull > 0x2100:
+                        lines[prev] = lineRaw + "loc_0x" + hexStr(progCounterFull, 6)
+                    else:
+                        diff = progCounterFull - prev
+                        lines[prev] = lineRaw + hexStr(diff, 4) + "h"
 
                     lines[prev] += SEPARATOR          
                     # and add a separator for niceness
