@@ -743,7 +743,7 @@ for i in range(len(lines)): # final formatting before replacements
     
 progStart = args.offset if args.offset else 0 if args.bios else 0x2100
 
-output = "\n".join([line.replace(STANDARD_PATTERN.format(hexStr(index + progStart, 6)) + "\n", "") + "".format(hexStr(index + progStart, 4).lower()) for index, line in enumerate(lines[progStart:]) if line != STANDARD_PATTERN.format(hexStr(index + progStart, 6))])
+output = "\n".join([line.replace(STANDARD_PATTERN.format(hexStr(index + progStart, 6)) + "\n", "") + " ; {}".format(hexStr(index + progStart, 4).lower()) for index, line in enumerate(lines[progStart:]) if line != STANDARD_PATTERN.format(hexStr(index + progStart, 6))])
 # clear empty lines
 unuseds = []
 unuseds_raw = []
