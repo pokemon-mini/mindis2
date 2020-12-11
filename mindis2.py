@@ -259,16 +259,16 @@ if args.symbols: # if the user passes a symbols file, parse it and add to the re
     for i in symfile:
         if i == "" or i.startswith(";"):
             continue
-        if (split := i.split())[0] in ["LOC", "LAB"] and split[2] != split[2].upper():
+        if (split := i.split())[0] in ["LOC", "LAB"] and (split[2] != split[2].upper() or split[2].startswith("__")):
             syms.append(split[:])
-        if (split := i.split())[0] in ["LAB"] and split[2] != split[2].upper():
+        if (split := i.split())[0] in ["LAB"] and (split[2] != split[2].upper() or split[2].startswith("__")):
             lab.append(split[:])
         if (split := i.split())[0] in ["REPL"]:
             repls.append(split[:])        
     for i in syms:
         address = int(i[1].replace("$", ""), 16)
         label = i[2].rstrip("\n")
-        replacements.append(["loc_0x{}".format(hexStr(address, 6)), label])
+        replacements.append(["loc_0x{}".format(hexStr(address, 6).upper()), label])
         if i[0] == "LOC":
             entrypoints.append([address & 0xFFFF | (0 if address < 0x10000 else 0x8000), [], address >> 15])
     for i in lab:
